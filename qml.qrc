@@ -1,0 +1,29 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>MetricRow.qml</file>
+        <file>fonts/Inter_28pt-Light.ttf</file>
+        <file>fonts/Inter_28pt-Medium.ttf</file>
+        <file>fonts/Inter_28pt-Thin.ttf</file>
+        <file>icons/BatteryErr.svg</file>
+        <file>icons/Cloudy.svg</file>
+        <file>icons/CloudyMain.png</file>
+        <file>icons/co2.png</file>
+        <file>icons/hum.png</file>
+        <file>icons/Rain.svg</file>
+        <file>icons/RainMain.png</file>
+        <file>icons/Snow.svg</file>
+        <file>icons/SnowMain.png</file>
+        <file>icons/Sun.svg</file>
+        <file>icons/SunMain.png</file>
+        <file>icons/temp.png</file>
+        <file>icons/TrendDown.svg</file>
+        <file>icons/TrendUp.svg</file>
+        <file>icons/Signal.svg</file>
+        <file>PressureBlock.qml</file>
+        <file>TimeSettingsPopup.qml</file>
+        <file>SwipeTile.qml</file>
+        <file>FlipTumbler.qml</file>
+        <file>DateSettingsPopup.qml</file>
+    </qresource>
+</RCC>
