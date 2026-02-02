@@ -23,7 +23,7 @@ public:
         qDebug() << "Setting system date to:" << dateString;
 
         // 2. Используем современный метод: программа отдельно, список аргументов отдельно
-        QString program = "date";
+        QString program = "sudo date";
         QStringList arguments;
         arguments << "-s" << dateString; // Аргумент "-s" и значение даты
 

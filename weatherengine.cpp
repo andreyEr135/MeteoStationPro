@@ -29,7 +29,16 @@ void WeatherEngine::updateData() {
     // Округляем уличную температуру для красоты
     QString rawOutTemp = readFile("/tmp/weather/out/temp");
     if (rawOutTemp != "--") {
+        double currentT = rawOutTemp.toDouble();
         m_outdoorTemp = QString::number(qRound(rawOutTemp.toDouble()));
+        // СОХРАНЯЕМ В ИСТОРИЮ
+        m_tempHistory.append({QDateTime::currentDateTime(), currentT});
+
+        // Храним историю ровно 24 часа (86400 секунд)
+        QDateTime now = QDateTime::currentDateTime();
+        while(!m_tempHistory.isEmpty() && m_tempHistory.first().time.secsTo(now) > 86400) {
+            m_tempHistory.removeFirst();
+        }
     } else {
         m_outdoorTemp = "--";
     }
@@ -138,4 +147,32 @@ int WeatherEngine::mapPressureToPills(double p) const {
     // Вы можете подправить этот диапазон под свой регион
     int pills = qRound((p - 740.0) / (765.0 - 740.0) * 7.0) + 1;
     return qBound(1, pills, 8); // Ограничиваем от 1 до 8
+}
+
+QVariantList WeatherEngine::getTemperatureHistory() const {
+    QVariantList list;
+    if (m_tempHistory.isEmpty()) return list;
+
+    QDateTime now = QDateTime::currentDateTime();
+    // Мы хотим получить 144 точки (по одной на каждые 10 минут за 24 часа)
+    for (int i = 143; i >= 0; --i) {
+        QDateTime targetTime = now.addSecs(-i * 600); // 600 сек = 10 мин
+        double bestTemp = -999.0;
+
+        // Ищем ближайшую точку в истории к этому времени
+        for (const auto &point : m_tempHistory) {
+            if (qAbs(point.time.secsTo(targetTime)) < 300) { // допуск 5 минут
+                bestTemp = point.temp;
+                break;
+            }
+        }
+
+        // Если данных для этого времени еще нет, пишем последнее известное или 0
+        if (bestTemp < -900.0) {
+            list.append(QVariant()); // Добавляем "пустое" значение вместо текущей температуры
+        } else {
+            list.append(bestTemp);
+        }
+    }
+    return list;
 }

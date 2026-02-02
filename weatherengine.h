@@ -60,6 +60,8 @@ public:
     bool isOnline() const { return m_isOnline; }
     bool isBatteryLow() const { return m_isBatteryLow; } // Геттер для батареи
 
+    Q_INVOKABLE QVariantList getTemperatureHistory() const;
+
 signals:
     void dataChanged();
 
@@ -90,6 +92,12 @@ private:
 
     QList<PressurePoint> m_history;
     QTimer *m_timer;
+
+    struct TempPoint {
+        QDateTime time;
+        double temp;
+    };
+    QList<TempPoint> m_tempHistory;
 
 
 };

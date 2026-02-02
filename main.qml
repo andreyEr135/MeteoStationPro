@@ -21,6 +21,10 @@ Window {
         anchors.centerIn: parent
     }
 
+    TemperatureGraph {
+        id: tempGraphPopup
+    }
+
 
 
     // --- ОБЩИЙ ФОН С ГРАДИЕНТОМ ---
@@ -202,6 +206,7 @@ Window {
                     MetricRow {
                         icon: "icons/temp.png"
                         value: weatherEngine.outdoorTemp + "°C"
+                        onClicked: tempGraphPopup.open()
                     }
                     MetricRow {
                         icon: "icons/hum.png"
