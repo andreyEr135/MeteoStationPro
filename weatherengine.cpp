@@ -46,17 +46,6 @@ void WeatherEngine::updateData() {
 
     // 4. Читаем давление и считаем прогноз
     QString pStr = readFile("/tmp/weather/in/press_indoor");
-    /*if (pStr != "--") {
-        double p = pStr.toDouble();
-        m_pressure = QString::number(qRound(p)); // Записываем целое число для дизайна
-
-        // Храним историю для тренда (3 часа = 10800 сек)
-        m_history.append({QDateTime::currentDateTime(), p});
-        while(m_history.size() > 0 && m_history.first().time.secsTo(QDateTime::currentDateTime()) > 10800)
-            m_history.removeFirst();
-
-        runPrediction(p);
-    } */
     if (pStr != "--") {
         double p = pStr.toDouble();
         m_pressure = QString::number(qRound(p));

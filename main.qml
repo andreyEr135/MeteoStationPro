@@ -141,37 +141,6 @@ Window {
                 PressureBlock {
                     Layout.fillWidth: true // Растягиваем на всю ширину колонки
                 }
-                /*ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 10
-
-                    Text {
-                        text: "Давление"
-                        color: "#00CCFF"
-                        font.family: "Inter"
-                        font.pixelSize: 18
-                        font.letterSpacing: 2
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-
-                        // Здесь будет ваш график или иконка давления
-                        Text {
-                            text: weatherEngine.pressure + " ↗️"
-                            color: "white"
-                            font.family: "Inter"
-                            font.pixelSize: 38
-                            font.weight: Font.DemiBold
-                        }
-                        Text {
-                            text: "мм.рт.ст."
-                            color: "#AAA"
-                            font.family: "Inter"
-                            font.pixelSize: 14
-                        }
-                    }
-                }*/
             }
 
             // Вертикальный разделитель
