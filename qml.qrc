@@ -26,5 +26,8 @@
         <file>FlipTumbler.qml</file>
         <file>DateSettingsPopup.qml</file>
         <file>TemperatureGraph.qml</file>
+        <file>Co2Graph.qml</file>
+        <file>SnowBackground.qml</file>
+        <file>RainBackground.qml</file>
     </qresource>
 </RCC>

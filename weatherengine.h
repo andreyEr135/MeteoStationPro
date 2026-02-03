@@ -60,7 +60,9 @@ public:
     bool isOnline() const { return m_isOnline; }
     bool isBatteryLow() const { return m_isBatteryLow; } // Геттер для батареи
 
-    Q_INVOKABLE QVariantList getTemperatureHistory() const;
+    Q_INVOKABLE QVariantList getOutdoorHistory() const;
+    Q_INVOKABLE QVariantList getIndoorHistory() const;
+    Q_INVOKABLE QVariantList getCo2History() const;
 
 signals:
     void dataChanged();
@@ -97,7 +99,15 @@ private:
         QDateTime time;
         double temp;
     };
-    QList<TempPoint> m_tempHistory;
+
+    struct Co2Point {
+        QDateTime time;
+        int ppm;
+    };
+    QVariantList formatHistoryData(const QList<TempPoint>& history) const;
+    QList<TempPoint> m_outdoorHistory;
+    QList<TempPoint> m_indoorHistory;
+    QList<Co2Point> m_co2History;
 
 
 };

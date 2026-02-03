@@ -20,54 +20,76 @@ QString WeatherEngine::readFile(const QString &path) {
 }
 
 void WeatherEngine::updateData() {
-    // 1. Читаем данные из комнаты
-    m_indoorTemp = readFile("/tmp/weather/in/temp_indoor");
-    m_indoorHum = readFile("/tmp/weather/in/hum_indoor");
-    m_co2 = readFile("/tmp/weather/in/co2_indoor");
+    QDateTime now = QDateTime::currentDateTime();
 
-    // 2. Читаем данные с улицы
-    // Округляем уличную температуру для красоты
+    // --- 1. КОМНАТА ---
+    QString rawInTemp = readFile("/tmp/weather/in/temp_indoor");
+    if (rawInTemp != "--") {
+        double inT = rawInTemp.toDouble();
+        // Округляем для экрана
+        m_indoorTemp = QString::number(qRound(inT));
+
+        // Добавляем в историю (точное значение) раз в 60 сек
+        if (m_indoorHistory.isEmpty() || m_indoorHistory.last().time.secsTo(now) >= 60) {
+            m_indoorHistory.append({now, inT});
+        }
+    } else {
+        m_indoorTemp = "--";
+    }
+
+    // Чистим историю (24 часа)
+    while(!m_indoorHistory.isEmpty() && m_indoorHistory.first().time.secsTo(now) > 86400) {
+        m_indoorHistory.removeFirst();
+    }
+
+    m_indoorHum = readFile("/tmp/weather/in/hum_indoor");
+
+    // --- 2. CO2 ---
+    m_co2 = readFile("/tmp/weather/in/co2_indoor");
+    bool co2Ok;
+    int currentCo2 = m_co2.toInt(&co2Ok);
+    if (co2Ok && (m_co2History.isEmpty() || m_co2History.last().time.secsTo(now) >= 60)) {
+        m_co2History.append({now, currentCo2});
+    }
+    while(!m_co2History.isEmpty() && m_co2History.first().time.secsTo(now) > 86400) {
+        m_co2History.removeFirst();
+    }
+
+    // --- 3. УЛИЦА ---
     QString rawOutTemp = readFile("/tmp/weather/out/temp");
     if (rawOutTemp != "--") {
-        double currentT = rawOutTemp.toDouble();
-        m_outdoorTemp = QString::number(qRound(rawOutTemp.toDouble()));
-        // СОХРАНЯЕМ В ИСТОРИЮ
-        m_tempHistory.append({QDateTime::currentDateTime(), currentT});
+        double outT = rawOutTemp.toDouble();
+        m_outdoorTemp = QString::number(qRound(outT));
 
-        // Храним историю ровно 24 часа (86400 секунд)
-        QDateTime now = QDateTime::currentDateTime();
-        while(!m_tempHistory.isEmpty() && m_tempHistory.first().time.secsTo(now) > 86400) {
-            m_tempHistory.removeFirst();
+        if (m_outdoorHistory.isEmpty() || m_outdoorHistory.last().time.secsTo(now) >= 60) {
+            m_outdoorHistory.append({now, outT});
         }
     } else {
         m_outdoorTemp = "--";
     }
 
-    // Добавили чтение влажности на улице
+    while(!m_outdoorHistory.isEmpty() && m_outdoorHistory.first().time.secsTo(now) > 86400) {
+        m_outdoorHistory.removeFirst();
+    }
+
     m_outdoorHum = readFile("/tmp/weather/out/hum");
 
-    // 3. Читаем статус системы
-    // Предполагаем, что 1 - ок, 0 - плохо
+    // --- 4. СТАТУС И БАТАРЕЯ ---
     m_isBatteryLow = (readFile("/tmp/weather/out/battery") == "0");
-    //qDebug() << m_isBatteryLow;
-    // Если файл существует и там не "--", считаем что мы онлайн
     m_isOnline = (readFile("/tmp/weather/out/status") == "1");
 
-    // 4. Читаем давление и считаем прогноз
+    // --- 5. ДАВЛЕНИЕ И ПРОГНОЗ ---
     QString pStr = readFile("/tmp/weather/in/press_indoor");
     if (pStr != "--") {
         double p = pStr.toDouble();
         m_pressure = QString::number(qRound(p));
 
-        m_history.append({QDateTime::currentDateTime(), p});
-
-        // ВНИМАНИЕ: Храним историю 4.5 часа (16200 сек), чтобы точка "-4 часа" всегда была в наличии
-        while(m_history.size() > 0 && m_history.first().time.secsTo(QDateTime::currentDateTime()) > 16200)
+        m_history.append({now, p});
+        while(!m_history.isEmpty() && m_history.first().time.secsTo(now) > 16200)
             m_history.removeFirst();
 
         runPrediction(p);
-    }
-    else {
+    } else {
         m_pressure = "--";
     }
 
@@ -149,29 +171,61 @@ int WeatherEngine::mapPressureToPills(double p) const {
     return qBound(1, pills, 8); // Ограничиваем от 1 до 8
 }
 
-QVariantList WeatherEngine::getTemperatureHistory() const {
+QVariantList WeatherEngine::formatHistoryData(const QList<TempPoint>& history) const {
     QVariantList list;
-    if (m_tempHistory.isEmpty()) return list;
+    if (history.isEmpty()) return list;
 
     QDateTime now = QDateTime::currentDateTime();
-    // Мы хотим получить 144 точки (по одной на каждые 10 минут за 24 часа)
     for (int i = 143; i >= 0; --i) {
-        QDateTime targetTime = now.addSecs(-i * 600); // 600 сек = 10 мин
+        QDateTime targetTime = now.addSecs(-i * 600);
         double bestTemp = -999.0;
 
-        // Ищем ближайшую точку в истории к этому времени
-        for (const auto &point : m_tempHistory) {
-            if (qAbs(point.time.secsTo(targetTime)) < 300) { // допуск 5 минут
+        for (const auto &point : history) {
+            if (qAbs(point.time.secsTo(targetTime)) < 300) {
                 bestTemp = point.temp;
-                break;
+                // Не делаем break сразу, чтобы найти САМУЮ близкую точку,
+                // если их несколько в интервале
             }
         }
 
-        // Если данных для этого времени еще нет, пишем последнее известное или 0
-        if (bestTemp < -900.0) {
-            list.append(QVariant()); // Добавляем "пустое" значение вместо текущей температуры
+        if (bestTemp < -900.0) list.append(QVariant());
+        else list.append(bestTemp);
+    }
+    return list;
+}
+
+
+QVariantList WeatherEngine::getOutdoorHistory() const {
+    return formatHistoryData(m_outdoorHistory);
+}
+
+QVariantList WeatherEngine::getIndoorHistory() const {
+    return formatHistoryData(m_indoorHistory);
+}
+
+QVariantList WeatherEngine::getCo2History() const {
+    QVariantList list;
+    //int totalPoints = 144; // 24 часа по 10 минут = 144 точки
+    QDateTime now = QDateTime::currentDateTime();
+
+    // Создаем сетку на 24 часа
+    for (int i = 143; i >= 0; --i) {
+        // Вычисляем время для каждой из 144 точек (назад в прошлое)
+        QDateTime targetTime = now.addSecs(-i * 600);
+        double bestVal = -1.0;
+
+        // Ищем в собранной истории m_co2History подходящую точку
+        for (const auto &point : m_co2History) {
+            if (qAbs(point.time.secsTo(targetTime)) < 300) { // разница меньше 5 минут
+                bestVal = point.ppm;
+            }
+        }
+
+        // Если данных для этого времени еще нет, добавляем QVariant(nullptr) или NaN
+        if (bestVal < 0) {
+            list.append(QVariant());
         } else {
-            list.append(bestTemp);
+            list.append(bestVal);
         }
     }
     return list;

@@ -8,6 +8,7 @@ Window {
     visible: true
     width: 800
     height: 480
+
     title: "Weather Station Pro"
 
     DateSettingsPopup {
@@ -23,6 +24,10 @@ Window {
 
     TemperatureGraph {
         id: tempGraphPopup
+    }
+
+    Co2Graph {
+        id: co2GraphPopup
     }
 
 
@@ -123,22 +128,75 @@ Window {
                 Layout.fillHeight: true
                 Layout.margins: 30
 
-                // Центрированная иконка погоды
-                Image {
-                    id: mainWeatherIcon
-                    source: weatherEngine.forecastMainIcon
+                // Центрированная иконка погоды (с анимацией)
+                Item { // Оборачиваем Image в Item для контроля над анимацией
                     Layout.alignment: Qt.AlignHCenter
-                    Layout.preferredWidth: 200
+                    Layout.preferredWidth: 200 // Задаем размеры для Item
                     Layout.preferredHeight: 200
-                    fillMode: Image.PreserveAspectFit
 
-                    // Добавляем мягкое свечение как в прошлом коде
-                    layer.enabled: true
-                    layer.effect: Glow {
-                        radius: 20; samples: 25;
-                        color: "white"; opacity: 0.3; spread: 0.1
+                    Image {
+                        id: mainWeatherIcon
+                        source: weatherEngine.forecastMainIcon
+                        anchors.centerIn: parent // Центрируем Image внутри Item
+                        width: parent.width     // Image занимает всю ширину Item
+                        height: parent.height   // Image занимает всю высоту Item
+                        fillMode: Image.PreserveAspectFit
+
+                        // Добавляем мягкое свечение как в прошлом коде
+                        layer.enabled: true
+                        layer.effect: Glow {
+                            radius: 20; samples: 25;
+                            color: "white"; opacity: 0.3; spread: 0.1
+                        }
+
+                        // --- АНИМАЦИИ ---
+
+                        // 1. Анимация плавания (вверх-вниз)
+                        SequentialAnimation {
+                            id: floatAnimation
+                            loops: Animation.Infinite // Бесконечный цикл
+                            running: true             // Начинаем сразу
+
+                            // Подъем
+                            PropertyAnimation {
+                                target: mainWeatherIcon; property: "y";
+                                from: 0; to: -10; // Сдвигаем вверх на 10 пикселей
+                                duration: 2000;   // За 2 секунды
+                                easing.type: Easing.InOutSine // Плавный старт/остановка
+                            }
+                            // Опускание
+                            PropertyAnimation {
+                                target: mainWeatherIcon; property: "y";
+                                from: -10; to: 0; // Возвращаем на место
+                                duration: 2000;   // За 2 секунды
+                                easing.type: Easing.InOutSine
+                            }
+                        }
+
+                        // 2. Анимация пульсации (увеличение-уменьшение)
+                        SequentialAnimation {
+                            id: pulseAnimation
+                            loops: Animation.Infinite
+                            running: true
+
+                            // Увеличение
+                            PropertyAnimation {
+                                target: mainWeatherIcon; property: "scale";
+                                from: 1.0; to: 1.05; // Увеличиваем на 5%
+                                duration: 1500;      // За 1.5 секунды
+                                easing.type: Easing.InOutSine
+                            }
+                            // Уменьшение
+                            PropertyAnimation {
+                                target: mainWeatherIcon; property: "scale";
+                                from: 1.05; to: 1.0; // Возвращаем к оригинальному размеру
+                                duration: 1500;
+                                easing.type: Easing.InOutSine
+                            }
+                        }
                     }
                 }
+
                 Item { Layout.fillHeight: true } // Распорка
 
                 // Блок давления
@@ -206,7 +264,11 @@ Window {
                     MetricRow {
                         icon: "icons/temp.png"
                         value: weatherEngine.outdoorTemp + "°C"
-                        onClicked: tempGraphPopup.open()
+                        onClicked: {
+                            tempGraphPopup.chartTitle = "История (Улица)"
+                            tempGraphPopup.canvas.history = weatherEngine.getOutdoorHistory()
+                            tempGraphPopup.open()
+                        }
                     }
                     MetricRow {
                         icon: "icons/hum.png"
@@ -226,6 +288,11 @@ Window {
                     MetricRow {
                         icon: "icons/temp.png"
                         value: weatherEngine.indoorTemp + "°C"
+                        onClicked: {
+                            tempGraphPopup.chartTitle = "История (Комната)"
+                            tempGraphPopup.canvas.history = weatherEngine.getIndoorHistory()
+                            tempGraphPopup.open()
+                        }
                     }
 
                     MetricRow {
@@ -237,9 +304,26 @@ Window {
                         icon: "icons/co2.png"
                         value: weatherEngine.co2 + " ppm"
                         textColor: parseInt(weatherEngine.co2) > 1000 ? "#FF3366" : "white"
+                        onClicked: {
+                            co2GraphPopup.canvas.history = weatherEngine.getCo2History(); // Вызываем вашу новую функцию из C++
+                            co2GraphPopup.open();
+                        }
                     }
                 }
             }
         }
+    }
+
+    SnowBackground {
+        id: snowEffect
+        anchors.fill: parent // Явно привязываем к окну
+        active: weatherEngine.forecastText.includes("СНЕГ")
+        //visible: weatherEngine.forecastText.includes("СНЕГ")
+    }
+
+    RainBackground {
+        anchors.fill: parent
+        // Включаем, если в тексте прогноза есть "ДОЖДЬ" или "ОСАДКИ"
+        active: weatherEngine.forecastText.toUpperCase().includes("ДОЖДЬ")
     }
 }

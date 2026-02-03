@@ -5,12 +5,16 @@
 #include <QLocale>
 #include <QTranslator>
 
+#include <QCursor>
+
 #include "weatherengine.h"
 #include "systemhelper.h"
 
 int main(int argc, char *argv[]) {
     QCoreApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
     QGuiApplication app(argc, argv);
+
+    app.setOverrideCursor(QCursor(Qt::BlankCursor));
 
     WeatherEngine engine;
     QQmlApplicationEngine qmlEngine;

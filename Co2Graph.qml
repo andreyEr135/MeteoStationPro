@@ -5,7 +5,7 @@ import QtGraphicalEffects 1.12
 
 Popup {
     id: root
-    property string chartTitle: "История"
+    property string chartTitle: "История CO2"
     property alias canvas: chartCanvas
     width: parent.width
     height: parent.height
@@ -50,6 +50,9 @@ Popup {
             Layout.fillHeight: true
             property var history: []
 
+            // Авто-перерисовка при получении новых данных
+            onHistoryChanged: requestPaint()
+
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.reset();
@@ -57,9 +60,9 @@ Popup {
 
                 if (!history || history.length < 1) return;
 
-                // --- 1. ВЫЧИСЛЯЕМ РЕАЛЬНЫЙ ДИАПАЗОН ДАННЫХ ---
-                var minV = 999;
-                var maxV = -999;
+                // --- 1. ВЫЧИСЛЯЕМ ДИАПАЗОН CO2 ---
+                var minV = 9999;
+                var maxV = -9999;
                 var hasData = false;
 
                 for (var k = 0; k < history.length; k++) {
@@ -70,53 +73,55 @@ Popup {
                     }
                 }
 
-                if (!hasData) { minV = 0; maxV = 30; }
+                // Дефолтный диапазон, если данных нет
+                if (!hasData) { minV = 400; maxV = 1000; }
 
-                // Динамические границы с запасом по 2 градуса
-                var viewMax = Math.ceil(maxV + 2);
-                var viewMin = Math.floor(minV - 2);
+                // Динамические границы (запас 50 ppm сверху и снизу)
+                var viewMax = Math.ceil((maxV + 50) / 50) * 50;
+                var viewMin = Math.floor((minV - 50) / 50) * 50;
 
-                // Если график плоский, расширяем до 10 градусов
-                if (viewMax - viewMin < 10) {
+                // Если график плоский, расширяем диапазон до 200 единиц
+                if (viewMax - viewMin < 200) {
                     var mid = (viewMax + viewMin) / 2;
-                    viewMax = Math.ceil(mid + 5);
-                    viewMin = Math.floor(mid - 5);
+                    viewMax = Math.ceil((mid + 100) / 50) * 50;
+                    viewMin = Math.floor((mid - 100) / 50) * 50;
                 }
 
                 var range = viewMax - viewMin;
 
-                // --- 2. НАСТРОЙКИ ОТСТУПОВ (ВАШИ 10 ПИКСЕЛЕЙ) ---
-                var mLeft = 70;
-                var mRight = 10;  // ВЕРНУЛ КАК БЫЛО
+                // --- 2. ОТСТУПЫ ---
+                var mLeft = 80;   // Чуть больше места слева для чисел вроде "1200"
+                var mRight = 10;  // ВАШ ОТСТУП 10
                 var mTop = 40;
                 var mBottom = 80;
 
                 var drawW = width - mLeft - mRight;
                 var drawH = height - mTop - mBottom;
 
-                // --- 3. СЕТКА ТЕМПЕРАТУРЫ ---
+                // --- 3. СЕТКА (ПО ВЕРТИКАЛИ - PPM) ---
                 ctx.lineWidth = 1;
                 ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
                 ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
-                ctx.font = "17px sans-serif";
+                ctx.font = "16px sans-serif";
                 ctx.textAlign = "right";
                 ctx.textBaseline = "middle";
 
-                var step = (range > 30) ? 10 : 5;
-                var startT = Math.floor(viewMin / step) * step;
+                // Шаг сетки: 200 если разброс большой, иначе 100
+                var step = (range > 800) ? 200 : 100;
+                var startVal = Math.floor(viewMin / step) * step;
 
-                for (var t = startT; t <= viewMax; t += step) {
-                    var gridY = mTop + (viewMax - t) / range * drawH;
+                for (var v = startVal; v <= viewMax; v += step) {
+                    var gridY = mTop + (viewMax - v) / range * drawH;
                     if (gridY < mTop || gridY > height - mBottom) continue;
 
                     ctx.beginPath();
                     ctx.moveTo(mLeft, gridY);
                     ctx.lineTo(width - mRight, gridY);
                     ctx.stroke();
-                    ctx.fillText(t + "°", mLeft - 10, gridY);
+                    ctx.fillText(v, mLeft - 10, gridY); // Без значка градуса
                 }
 
-                // --- 4. СЕТКА ВРЕМЕНИ ---
+                // --- 4. СЕТКА (ПО ГОРИЗОНТАЛИ - ВРЕМЯ) ---
                 var now = new Date();
                 ctx.textBaseline = "top";
                 for (var i = 0; i <= 24; i += 6) {
@@ -127,7 +132,7 @@ Popup {
                     ctx.stroke();
 
                     if (i === 24) {
-                        ctx.textAlign = "right"; // Чтобы "Сейчас" не вылезло за край
+                        ctx.textAlign = "right";
                         ctx.fillText("Сейчас", gridX, height - mBottom + 10);
                     } else {
                         var labelHour = new Date(now.getTime() - (24 - i) * 3600000).getHours();
@@ -137,7 +142,7 @@ Popup {
                     }
                 }
 
-                // --- 5. ОТРИСОВКА ЛИНИИ ---
+                // --- 5. ОТРИСОВКА ЛИНИИ (ГРАДИЕНТНАЯ) ---
                 var points = [];
                 for (var j = 0; j < history.length; j++) {
                     if (history[j] === null || isNaN(history[j])) continue;
@@ -148,13 +153,24 @@ Popup {
                 }
 
                 if (points.length > 1) {
-                    ctx.strokeStyle = "#00CCFF";
+                    ctx.beginPath();
+                    ctx.strokeStyle = "#00FFCC"; // Цвет для CO2 (бирюзовый/зеленоватый)
                     ctx.lineWidth = 4;
                     ctx.lineJoin = "round";
-                    ctx.beginPath();
+                    ctx.lineCap = "round";
+
                     ctx.moveTo(points[0].x, points[0].y);
-                    for (var l = 1; l < points.length; l++) ctx.lineTo(points[l].x, points[l].y);
+                    for (var l = 1; l < points.length; l++) {
+                        ctx.lineTo(points[l].x, points[l].y);
+                    }
                     ctx.stroke();
+
+                    // Последняя точка (текущее значение)
+                    var last = points[points.length-1];
+                    ctx.fillStyle = "#00FFCC";
+                    ctx.beginPath();
+                    ctx.arc(last.x, last.y, 5, 0, Math.PI * 2);
+                    ctx.fill();
                 }
             }
         }
@@ -169,6 +185,5 @@ Popup {
             onClicked: root.close()
         }
     }
-
     onOpened: chartCanvas.requestPaint()
 }

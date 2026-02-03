@@ -60,7 +60,7 @@ Popup {
             FlipTumbler {
                 id: hourTumbler
                 Layout.fillWidth: true
-                from: 0; to: 24
+                from: 0; to: 23
                 currentIndex: root.selHour
             }
 
